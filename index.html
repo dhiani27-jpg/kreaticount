@@ -94,9 +94,14 @@
     .doc-table{width:100%;border-collapse:collapse;font-size:13px}
     .doc-table th,.doc-table td{border:1px solid #222;padding:6px;vertical-align:top}
     .doc-table th{background:#f1f5f9}
-    .signature{display:flex;justify-content:flex-end;margin-top:40px}
-    .signature-box{text-align:center;min-width:220px}
-    .signature-img{height:70px;object-fit:contain}
+    .signature{display:flex;justify-content:flex-end;margin-top:48px;page-break-inside:avoid}
+    .signature-box{width:270px;text-align:center;line-height:1.35}
+    .sign-date{margin-bottom:8px}
+    .sign-text{margin-bottom:8px}
+    .signature-area{height:105px;display:flex;align-items:center;justify-content:center;margin:2px 0 0}
+    .signature-img{display:block;max-width:210px;max-height:100px;object-fit:contain}
+    .sign-name{font-weight:bold;font-size:16px;margin-top:2px;line-height:1.2}
+    .sign-title{font-size:13px;color:#475569;margin-top:3px}
     .hide-print{display:block}
 
     .doc-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
@@ -165,6 +170,14 @@
           <label class="small-label">Tujuan Wisata</label>
           <input id="destination" class="form-control" placeholder="Jogja, Bali, Malang...">
         </div>
+        <div class="col-md-4">
+          <label class="small-label">Start Kota / Titik Jemput</label>
+          <input id="startCity" class="form-control" placeholder="Contoh: Kendal / Semarang / Kantor Desa">
+        </div>
+        <div class="col-md-4">
+          <label class="small-label">Start Jam</label>
+          <input type="time" id="startTime" class="form-control" value="06:00">
+        </div>
         <div class="col-6 col-md-3">
           <label class="small-label">Tanggal Mulai</label>
           <input type="date" id="startDate" class="form-control" onchange="updateDaysAuto()">
@@ -182,6 +195,13 @@
           <input id="participants" type="number" class="form-control" value="1" min="1" oninput="calculateAll()">
         </div>
       </div>
+    </div>
+
+    <div class="cardx">
+      <h6 class="fw-bold"><i class="fa-solid fa-route"></i> Itinerary / Jadwal Perjalanan untuk Penawaran</h6>
+      <p class="text-muted small mb-2">Isi jadwal yang akan diberikan ke klien. Contoh: Hari 1: 06.00 berangkat dari Kendal, 10.00 Lava Tour, 13.00 makan siang, dst.</p>
+      <textarea id="itineraryNotes" class="form-control" rows="6" placeholder="Hari 1: 06.00 Berangkat dari ...
+Hari 2: Breakfast hotel, city tour, belanja oleh-oleh, kembali ke kota asal..."></textarea>
     </div>
 
     <div id="categoryContainer"></div>
@@ -214,7 +234,11 @@
       <div class="summary-grid">
         <div class="summary-box"><div class="small-label">Subtotal RAB</div><h4 id="subtotalView">Rp0</h4></div>
         <div class="summary-box"><div class="small-label">Total + Agent Fee</div><h4 id="grandTotalView">Rp0</h4></div>
-        <div class="summary-box"><div class="small-label">Harga Per Pax</div><h4 id="pricePaxView">Rp0</h4></div>
+        <div class="summary-box"><div class="small-label">Harga Asli / Pax</div><h4 id="rawPricePaxView">Rp0</h4></div>
+        <div class="summary-box"><div class="small-label">Harga Jual / Pax Bulat</div><h4 id="pricePaxView">Rp0</h4></div>
+        <div class="summary-box"><div class="small-label">Total Jual Paket</div><h4 id="sellingTotalView">Rp0</h4></div>
+        <div class="summary-box"><div class="small-label">Profit / Buffer Pembulatan</div><h4 id="roundingProfitView">Rp0</h4></div>
+        <div class="summary-box"><div class="small-label">Pembulatan</div><h4 id="roundingView">Ke atas 10.000</h4></div>
         <div class="summary-box"><div class="small-label">Durasi Otomatis</div><h4 id="durationView">1 Hari</h4></div>
       </div>
 
@@ -442,17 +466,36 @@ function syncItem(key,id){
   row.querySelector(".item-total").innerText=rupiah(item.qty*item.days*item.price);
   calculateAll();
 }
+function roundUpTo(value, step){
+  const angka = Number(value) || 0;
+  const pembulatan = Number(step) || 10000;
+  return Math.ceil(angka / pembulatan) * pembulatan;
+}
 function calculateAll(){
   let subtotal=0;
   Object.values(state.items).flat().forEach(it=> subtotal += (Number(it.qty)||0)*(Number(it.days)||0)*(Number(it.price)||0));
   const fee=num("agentFee");
   const grand=subtotal+fee;
   const pax=Math.max(num("participants"),1);
+
+  // PEMBULATAN HARGA PAX KE ATAS
+  // Contoh: 9.200.000 / 30 = 306.666,66 => dibulatkan menjadi 310.000
+  const roundingStep = 10000;
+  const rawPricePax = grand / pax;
+  const pricePax = roundUpTo(rawPricePax, roundingStep);
+  const sellingTotal = pricePax * pax;
+  const roundingProfit = sellingTotal - grand;
+
   subtotalView.innerText=rupiah(subtotal);
   grandTotalView.innerText=rupiah(grand);
-  pricePaxView.innerText=rupiah(Math.ceil(grand/pax));
+  if(document.getElementById("rawPricePaxView")) rawPricePaxView.innerText=rupiah(Math.ceil(rawPricePax));
+  pricePaxView.innerText=rupiah(pricePax);
+  if(document.getElementById("sellingTotalView")) sellingTotalView.innerText=rupiah(sellingTotal);
+  if(document.getElementById("roundingProfitView")) roundingProfitView.innerText=rupiah(roundingProfit);
+  if(document.getElementById("roundingView")) roundingView.innerText="Ke atas "+rupiah(roundingStep).replace("Rp","");
   durationView.innerText=(num("tourDays")||1)+" Hari";
-  return {subtotal, fee, grand, pax, pricePax:Math.ceil(grand/pax)};
+
+  return {subtotal, fee, grand, pax, rawPricePax:Math.ceil(rawPricePax), pricePax, sellingTotal, roundingProfit, roundingStep};
 }
 function updateDaysAuto(){
   const s=val("startDate"), e=val("endDate");
@@ -497,6 +540,9 @@ function getPayload(){
     guestName: val("guestName"),
     guestPhone: val("guestPhone"),
     destination: val("destination"),
+    startCity: val("startCity"),
+    startTime: val("startTime"),
+    itineraryNotes: val("itineraryNotes"),
     startDate: val("startDate"),
     endDate: val("endDate"),
     days: num("tourDays"),
@@ -575,6 +621,9 @@ function historyTableHtml(rows, action){
 }
 function loadToForm(x){
   guestName.value=x.guestName||""; guestPhone.value=x.guestPhone||""; destination.value=x.destination||"";
+  if(document.getElementById("startCity")) startCity.value=x.startCity||"";
+  if(document.getElementById("startTime")) startTime.value=x.startTime||"06:00";
+  if(document.getElementById("itineraryNotes")) itineraryNotes.value=x.itineraryNotes||"";
   startDate.value=x.startDate||""; endDate.value=x.endDate||""; tourDays.value=x.days||1; participants.value=x.participants||1;
   agentFee.value=x.agentFee||0; status.value=x.status||"PENAWARAN"; docNo.value=x.id||"";
   state.items=x.items || {};
@@ -599,10 +648,13 @@ function generateDocs(){
   const sign = `
     <div class="signature">
       <div class="signature-box">
-        <div>${fmtDate(todayISO())}</div>
-        <div>Hormat kami,</div>
-        ${s.ttd ? `<img class="signature-img" src="${s.ttd}">` : `<div style="height:70px"></div>`}
-        <b><u>${escapeHtml(s.pj)}</u></b>
+        <div class="sign-date">${fmtDate(todayISO())}</div>
+        <div class="sign-text">Hormat Kami,</div>
+        <div class="signature-area">
+          ${s.ttd ? `<img class="signature-img" src="${s.ttd}" alt="Tanda Tangan">` : ``}
+        </div>
+        <div class="sign-name"><u>${escapeHtml(s.pj)}</u></div>
+        <div class="sign-title">Penanggung Jawab</div>
       </div>
     </div>`;
   const penawaran = `
@@ -610,18 +662,19 @@ function generateDocs(){
       ${header}
       <div class="doc-title">SURAT PENAWARAN PAKET WISATA</div>
       <p>Kepada Yth.<br><b>${escapeHtml(p.guestName || "Calon Tamu")}</b><br>di Tempat</p>
-      <p>Dengan hormat, bersama ini kami sampaikan penawaran paket wisata dengan rincian sebagai berikut:</p>
+      <p>Dengan hormat, bersama ini kami sampaikan penawaran paket wisata dengan detail sebagai berikut:</p>
       <table class="doc-table">
-        <tr><th>Tujuan</th><td>${escapeHtml(p.destination)}</td></tr>
+        <tr><th>Nomor Penawaran</th><td>${escapeHtml(p.id)}</td></tr>
+        <tr><th>Tujuan Wisata</th><td>${escapeHtml(p.destination)}</td></tr>
+        <tr><th>Start Kota / Titik Jemput</th><td>${escapeHtml(p.startCity || "Menyesuaikan kesepakatan")}</td></tr>
+        <tr><th>Start Jam</th><td>${escapeHtml(p.startTime || "Menyesuaikan")}</td></tr>
         <tr><th>Tanggal Wisata</th><td>${fmtDate(p.startDate)} s.d ${fmtDate(p.endDate)} (${p.days} hari)</td></tr>
         <tr><th>Jumlah Peserta</th><td>${p.participants} pax</td></tr>
-        <tr><th>Total Biaya Paket</th><td><b>${rupiah(p.totals.grand)}</b></td></tr>
-        <tr><th>Harga per Pax</th><td><b>${rupiah(p.totals.pricePax)}</b></td></tr>
+        <tr><th>Harga Paket per Orang</th><td><b>${rupiah(p.totals.pricePax)}</b> / pax</td></tr>
+        <tr><th>Total Biaya Paket</th><td><b>${rupiah(p.totals.sellingTotal || p.totals.grand)}</b></td></tr>
       </table>
       <h4>Itinerary Perjalanan</h4>${itinerary}
-      <h4>Rincian RAB Paket</h4>
-      <table class="doc-table"><thead><tr><th>Kategori</th><th>Item</th><th>Qty</th><th>Hari/Kali</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>${costRows}</tbody></table>
-      <p><b>Catatan:</b> Harga dapat berubah apabila terdapat perubahan jumlah peserta, tanggal perjalanan, atau fasilitas yang diminta.</p>
+      <p><b>Catatan:</b> Harga berlaku sesuai jumlah peserta, tanggal perjalanan, fasilitas, serta itinerary yang tercantum dalam penawaran ini. Rincian RAB internal tidak ditampilkan dalam surat penawaran kepada klien.</p>
       ${sign}
     </div>`;
   const invoice = `
@@ -639,8 +692,8 @@ function generateDocs(){
       <table class="doc-table">
         <thead><tr><th>Uraian</th><th>Jumlah</th></tr></thead>
         <tbody>
-          <tr><td>Paket wisata ${escapeHtml(p.destination)} untuk ${p.participants} pax</td><td>${rupiah(p.totals.grand)}</td></tr>
-          <tr><td><b>Total Tagihan</b></td><td><b>${rupiah(p.totals.grand)}</b></td></tr>
+          <tr><td>Paket wisata ${escapeHtml(p.destination)} untuk ${p.participants} pax</td><td>${rupiah(p.totals.sellingTotal || p.totals.grand)}</td></tr>
+          <tr><td><b>Total Tagihan</b></td><td><b>${rupiah(p.totals.sellingTotal || p.totals.grand)}</b></td></tr>
         </tbody>
       </table>
       <p>Pembayaran dapat ditransfer ke rekening:<br><b>${escapeHtml(s.bank)}</b></p>
@@ -652,7 +705,7 @@ function generateDocs(){
       <div class="doc-title">KUITANSI PEMBAYARAN</div>
       <table class="doc-table">
         <tr><th>Telah diterima dari</th><td>${escapeHtml(p.guestName)}</td></tr>
-        <tr><th>Uang sejumlah</th><td><b>${rupiah(p.totals.grand)}</b></td></tr>
+        <tr><th>Uang sejumlah</th><td><b>${rupiah(p.totals.sellingTotal || p.totals.grand)}</b></td></tr>
         <tr><th>Untuk pembayaran</th><td>Paket wisata ${escapeHtml(p.destination)} tanggal ${fmtDate(p.startDate)} s.d ${fmtDate(p.endDate)} untuk ${p.participants} pax</td></tr>
         <tr><th>Status</th><td><b>${p.status === "LUNAS" ? "LUNAS" : "BELUM LUNAS / MENUNGGU PEMBAYARAN"}</b></td></tr>
       </table>
@@ -672,15 +725,32 @@ function buildCostRows(items){
   const t=calculateAll();
   html+=`<tr><td colspan="5"><b>Subtotal</b></td><td><b>${rupiah(t.subtotal)}</b></td></tr>`;
   html+=`<tr><td colspan="5"><b>Agent Fee</b></td><td><b>${rupiah(t.fee)}</b></td></tr>`;
-  html+=`<tr><td colspan="5"><b>Total</b></td><td><b>${rupiah(t.grand)}</b></td></tr>`;
+  html+=`<tr><td colspan="5"><b>Total Cost</b></td><td><b>${rupiah(t.grand)}</b></td></tr>`;
+  html+=`<tr><td colspan="5"><b>Harga Jual / Pax Bulat</b></td><td><b>${rupiah(t.pricePax)}</b></td></tr>`;
+  html+=`<tr><td colspan="5"><b>Total Jual Paket</b></td><td><b>${rupiah(t.sellingTotal)}</b></td></tr>`;
+  html+=`<tr><td colspan="5"><b>Profit / Buffer Pembulatan</b></td><td><b>${rupiah(t.roundingProfit)}</b></td></tr>`;
   return html;
 }
 function buildItinerary(p){
+  const notes = String(p.itineraryNotes || "").trim();
+  if(notes){
+    const lines = notes.split(/
++/).map(x=>x.trim()).filter(Boolean);
+    let html = "<table class='doc-table'><thead><tr><th>No</th><th>Jadwal / Itinerary</th></tr></thead><tbody>";
+    lines.forEach((line, idx)=>{
+      html += `<tr><td>${idx+1}</td><td>${escapeHtml(line)}</td></tr>`;
+    });
+    return html + "</tbody></table>";
+  }
+
   const days=Number(p.days)||1;
   let html="<table class='doc-table'><thead><tr><th>Hari</th><th>Rencana Perjalanan</th></tr></thead><tbody>";
   for(let i=1;i<=days;i++){
-    const obyek=(p.items.obyek||[]).filter(x=>(x.name||"").toLowerCase().includes("hari "+i) || (x.name||"").toLowerCase().includes("h"+i)).map(x=>x.name).join(", ");
-    html+=`<tr><td>Hari ${i}</td><td>${obyek || "Program wisata menyesuaikan rundown perjalanan."}</td></tr>`;
+    const obyek=(p.items.obyek||[])
+      .filter(x=>(x.name||"").toLowerCase().includes("hari "+i) || (x.name||"").toLowerCase().includes("h"+i))
+      .map(x=>x.name).join(", ");
+    const startInfo = i===1 ? `Start ${p.startTime || "jam menyesuaikan"} dari ${p.startCity || "kota asal"}. ` : "";
+    html+=`<tr><td>Hari ${i}</td><td>${startInfo}${obyek || "Program wisata menyesuaikan rundown perjalanan."}</td></tr>`;
   }
   return html+"</tbody></table>";
 }
@@ -729,7 +799,7 @@ Terima kasih, pembayaran paket wisata telah kami terima.
 No Kuitansi: ${p.id}
 Nama: ${p.guestName}
 Tujuan: ${p.destination}
-Jumlah: ${rupiah(p.totals.grand)}
+Jumlah: ${rupiah(p.totals.sellingTotal || p.totals.grand)}
 Status: LUNAS
 
 Kuitansi kami lampirkan. Terima kasih.`;
@@ -744,7 +814,7 @@ Tanggal: ${fmtDate(p.startDate)} s.d ${fmtDate(p.endDate)}
 Durasi: ${p.days} hari
 Peserta: ${p.participants} pax
 Harga per pax: ${rupiah(p.totals.pricePax)}
-Total paket: ${rupiah(p.totals.grand)}
+Total paket: ${rupiah(p.totals.sellingTotal || p.totals.grand)}
 
 Silakan cek dokumen penawaran terlampir. Terima kasih.`;
 }
