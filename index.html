@@ -734,8 +734,7 @@ function buildCostRows(items){
 function buildItinerary(p){
   const notes = String(p.itineraryNotes || "").trim();
   if(notes){
-    const lines = notes.split(/
-+/).map(x=>x.trim()).filter(Boolean);
+    const lines = notes.split(/\n+/).map(x=>x.trim()).filter(Boolean);
     let html = "<table class='doc-table'><thead><tr><th>No</th><th>Jadwal / Itinerary</th></tr></thead><tbody>";
     lines.forEach((line, idx)=>{
       html += `<tr><td>${idx+1}</td><td>${escapeHtml(line)}</td></tr>`;
